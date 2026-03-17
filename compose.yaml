@@ -2,3 +2,64 @@
 # m2 is microservice 2
 # auth is authentication/authorization
 # web is frontend
+
+services:
+  auth-db:
+    image: postgres:18
+    restart: always
+    env_file:
+      - ./auth/.env.dev
+    ports:
+      - "5432:5432" 
+    networks:
+      - m_network
+    volumes:
+      - auth_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  m1-db:
+    image: postgres:18
+    restart: always
+    env_file:
+      - ./m1/.env.dev
+    ports:
+      - "5430:5432" 
+    networks:
+      - m_network
+    volumes:
+      - m1_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  m2-db:
+    image: postgres:18
+    restart: always
+    env_file:
+      - ./m2/.env.dev
+    ports:
+      - "5431:5432" 
+    networks:
+      - m_network
+    volumes:
+      - m2_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+networks:
+  m_network:
+    driver: bridge
+
+volumes:
+  auth_db_data:
+  m1_db_data:
+  m2_db_data:
