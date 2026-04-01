@@ -4,6 +4,28 @@
 # web is frontend
 
 services:
+  m1:
+    build:
+      context: ./m1
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    networks:
+      - m_network
+    env_file:
+      - ./m1/.env.dev
+    depends_on:
+      m1-db:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: ./m1/package.json
+          action: rebuild
+        - path: ./m1/pnpm-lock.yaml
+          action: rebuild
+        - path: ./m1/src
+          target: /app/src
+          action: sync
   auth-db:
     image: postgres:18
     restart: always

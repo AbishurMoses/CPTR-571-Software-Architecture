@@ -33,56 +33,9 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => {
     res.json({
-        message: "Backend is working",
+        message: "Backend is workingggg",
         port: PORT
     });
-});
-
-app.get('/sync-games', async (req, res) => {
-    const em = req.em;
-    const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
-    const now = Math.floor(Date.now() / 1000);
-    const HARDCODED_ID = 1
-
-    try {
-        let meta = await em.findOne(Metadata, { id: HARDCODED_ID });
-
-        if (!meta || (now - meta.lastSyncTimestamp) > SEVEN_DAYS_IN_SECONDS) {
-            console.log("Sync is outdated. Fetching new games...");
-
-            const since = meta ? meta.lastSyncTimestamp : (now - SEVEN_DAYS_IN_SECONDS);
-
-            const url = `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${process.env.STEAM_API_KEY}&include_games=true&if_modified_since=${since}`;
-            const response = await fetch(url);
-            const data = await response.json();
-            const games = data.response?.apps || [];
-
-            if (games.length > 0) {
-                await em.upsertMany('Game', games.map(g => ({
-                    appId: g.appid,
-                    name: g.name,
-                    lastModified: g.last_modified
-                })));
-            }
-
-            if (!meta) {
-                // Removed serviceName here
-                meta = em.create(Metadata, { lastSyncTimestamp: now });
-                em.persist(meta);
-            } else {
-                meta.lastSyncTimestamp = now;
-            }
-
-            await em.flush();
-            return res.json({ message: "Sync complete", updated: games.length });
-        }
-
-        res.json({ message: "Sync is still fresh", last_sync: new Date(meta.lastSyncTimestamp * 1000) });
-
-    } catch (e) {
-        console.error(e);
-        res.status(500).send("Sync check failed");
-    }
 });
 
 app.get('/seed-all-games', async (req, res) => {
@@ -141,7 +94,7 @@ app.get('/seed-all-games', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Seeding failed:", error);
+        console.error("Seeding failed:", error);
         res.status(500).json({ error: "Full seeding failed", details: error.message });
     }
 });
