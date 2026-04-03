@@ -53,6 +53,10 @@ let UsersService = class UsersService {
         this.em = em;
     }
     async create(createUserDto) {
+        const duplicate = await this.em.findOne(user_entity_1.User, { username: createUserDto.username });
+        if (duplicate) {
+            throw new common_1.ConflictException('Username already exists');
+        }
         const passhash = await bcrypt.hash(createUserDto.password, 10);
         const role = createUserDto.role ?? 1;
         const user = await this.em.create(user_entity_1.User, {
