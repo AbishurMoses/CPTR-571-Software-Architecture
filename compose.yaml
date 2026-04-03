@@ -4,33 +4,41 @@
 # web is frontend
 
 services:
-  m1:
+  auth:
     build:
-      context: ./m1
+      context: ./auth
       dockerfile: Dockerfile.dev
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    restart: always
+    env_file: 
+      - ./auth/.env
     ports:
-      - "3000:3000"
+      - "4000:4000"
     networks:
       - m_network
-    env_file:
-      - ./m1/.env.dev
-    depends_on:
-      m1-db:
-        condition: service_healthy
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=300
     develop:
       watch:
-        - path: ./m1/package.json
-          action: rebuild
-        - path: ./m1/pnpm-lock.yaml
-          action: rebuild
-        - path: ./m1/src
+        - action: sync
+          path: ./auth/src
           target: /app/src
-          action: sync
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./auth/package.json
+    volumes:
+      - ./auth:/app
+      - /app/node_modules
+
   auth-db:
     image: postgres:18
     restart: always
     env_file:
-      - ./auth/.env.dev
+      - ./auth/.env
     ports:
       - "5432:5432" 
     networks:
