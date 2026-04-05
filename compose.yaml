@@ -4,6 +4,28 @@
 # web is frontend
 
 services:
+
+  m1:
+    build:
+      context: ./m1
+      dockerfile: Dockerfil.dev
+    depends_on:
+      m1-db:
+        condition: service_healthy
+    restart: always
+    env_file:
+      - ./m1/.env.dev
+    ports:
+      - "3000:3000"
+    networks:
+      - m-network
+    develop:
+      watch:
+        - action: sync
+          path: ./auth/src
+          target: /app/src
+          action: sync
+
   auth:
     build:
       context: ./auth
