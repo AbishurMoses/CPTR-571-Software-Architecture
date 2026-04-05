@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => {
     res.json({
-        message: "Backend is workingggg",
+        message: "Backend is working",
         port: PORT
     });
 });
