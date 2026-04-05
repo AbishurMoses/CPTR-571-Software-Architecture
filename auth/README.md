@@ -21,7 +21,7 @@ Retrieve system health response:
 }
 ```
 
-## User web services
+## User services
 Usernames must be unique and passwords must be at least 6 characters long and contain at least one lowercase letter and a number. 
 
 An optional role can be added which defaults to 1 if missing. See permission definitions below:
