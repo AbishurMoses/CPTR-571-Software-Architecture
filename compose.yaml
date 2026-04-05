@@ -21,15 +21,6 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=300
-    develop:
-      watch:
-        - action: sync
-          path: ./auth/src
-          target: /app/src
-          ignore:
-            - node_modules/
-        - action: rebuild
-          path: ./auth/package.json
     volumes:
       - ./auth:/app
       - /app/node_modules
