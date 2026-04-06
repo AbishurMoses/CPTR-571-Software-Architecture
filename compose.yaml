@@ -59,7 +59,7 @@ services:
   m1:
     build:
       context: ./m1
-      dockerfile: Dockerfil.dev
+      dockerfile: Dockerfile.dev
     depends_on:
       m1-db:
         condition: service_healthy
@@ -69,13 +69,12 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - m-network
+      - m_network
     develop:
       watch:
         - action: sync
           path: ./auth/src
           target: /app/src
-          action: sync
 
   m1-db:
     image: postgres:18
