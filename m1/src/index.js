@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => {
     res.json({
-        message: "Backend is working",
+        message: "Steam API is working",
         port: PORT
     });
 });
@@ -169,6 +169,25 @@ app.get('/game/:id', async (req, res) => {
         }
     } catch (e) {
         res.status(500).json({ error: "Failed to fetch game details" });
+    }
+});
+
+app.get('/steam-all-games', async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 50;
+    const offset = (page - 1) * limit;
+
+    try {
+        const [games, total] = await req.em.findAndCount(Game, {}, { limit, offset, orderBy: { appId: 'ASC' } });
+
+        res.json({
+            page,
+            total_pages: Math.ceil(total / limit),
+            total_games: total,
+            data: games
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch games", details: error.message });
     }
 });
 

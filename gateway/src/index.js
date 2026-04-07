@@ -1,19 +1,30 @@
-const express = require('express')
+import express from 'express';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '..', '.env.dev') });
+
 const app = express()
-const port = 2000
+const PORT = process.env.API_PORT;
 
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.send('Gateway is ready')
-})
-
+  res.json({
+    message: "Gateway is workinggggg",
+    port: PORT
+  });
+}) 
 
 app.post('/authenticate-user', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const response = await fetch('http://localhost:4000/authenticate', {
+    const response = await fetch('http://auth:4000/authenticate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -41,7 +52,7 @@ app.post('/create-user', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const response = await fetch('http://localhost:4000/users', {
+    const response = await fetch('http://auth:4000/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -66,7 +77,7 @@ app.post('/create-user', async (req, res) => {
 
 app.get('/health-all', async (req, res) => {
   try {
-    const steamFetch = fetch('http://localhost:3000/health')
+    const steamFetch = fetch('http://m1:3000/health')
       .then(r => r.ok ? 'OK' : 'NO')
       .catch(() => 'NO');
 
@@ -86,7 +97,7 @@ app.get('/health-all', async (req, res) => {
 
 app.get('/fetch-all-games', async (req, res) => {
   const page = req.query.page || 1;
-  const targetUrl = `http://127.0.0.1:3000/steam-all-games?page=${page}`;
+  const targetUrl = `http://m1:3000/steam-all-games?page=${page}`;
 
   console.log(`Gateway is attempting to fetch: ${targetUrl}`);
 
@@ -130,6 +141,6 @@ app.get('/fetch-all-games', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
+app.listen(PORT, () => {
+  console.log(`Example app listening on PORT ${PORT}`)
 })
