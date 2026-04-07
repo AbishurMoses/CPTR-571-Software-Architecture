@@ -1,0 +1,25 @@
+{
+  "name": "m2",
+  "version": "1.0.0",
+  "description": "Epic Games microservice",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.24.0",
+  "dependencies": {
+    "@mikro-orm/core": "^7.0.2",
+    "@mikro-orm/postgresql": "^7.0.2",
+    "@mikro-orm/reflection": "^7.0.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
