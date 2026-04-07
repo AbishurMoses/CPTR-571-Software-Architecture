@@ -4,27 +4,19 @@
 # web is frontend
 
 services:
-
-  m1:
+  web:
     build:
-      context: ./m1
-      dockerfile: Dockerfil.dev
-    depends_on:
-      m1-db:
-        condition: service_healthy
-    restart: always
-    env_file:
-      - ./m1/.env.dev
+      context: ./web
+      dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
+      - "1000:1000"
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
     networks:
-      - m-network
-    develop:
-      watch:
-        - action: sync
-          path: ./auth/src
-          target: /app/src
-          action: sync
+      - m_network
 
   auth:
     build:
@@ -45,7 +37,7 @@ services:
       - CHOKIDAR_INTERVAL=300
     volumes:
       - ./auth:/app
-      - /app/node_modules
+      - auth_node_modules:/app/node_modules
 
   auth-db:
     image: postgres:18
@@ -63,6 +55,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  m1:
+    build:
+      context: ./m1
+      dockerfile: Dockerfile.dev
+    depends_on:
+      m1-db:
+        condition: service_healthy
+    restart: always
+    env_file:
+      - ./m1/.env.dev
+    ports:
+      - "3000:3000"
+    networks:
+      - m_network
+    develop:
+      watch:
+        - action: sync
+          path: ./auth/src
+          target: /app/src
 
   m1-db:
     image: postgres:18
@@ -103,6 +115,9 @@ networks:
     driver: bridge
 
 volumes:
+  web_node_modules:
+  auth_node_modules:
   auth_db_data:
   m1_db_data:
   m2_db_data:
+  
