@@ -12,7 +12,7 @@ import * as fs from 'fs';
       privateKey: fs.readFileSync('private.key'),
       signOptions: {
         algorithm: 'RS256',
-        expiresIn: '1h',
+        expiresIn: '15m',
       }
     })
   ],
