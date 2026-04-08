@@ -1,32 +1,46 @@
 import { useState } from "react"
 
-export default function LoginPage() {
+interface LoginPageProps {
+    setLoggedIn: (value: boolean) => void;
+}
+
+export default function LoginPage({ setLoggedIn }: LoginPageProps) {
     const [registerData, setRegisterData] = useState({ username: "", password: "" });
     const [loginData, setLoginData] = useState({ username: "", password: "" });
+    const [registerMessage, setRegisterMessage] = useState("");
+    const [loginMessage, setLoginMessage] = useState("");
+
 
     const handleRegisterSubmit = async (e: any) => {
         e.preventDefault();
-        const response = await fetch("http://localhost:4000/users", {
+        fetch("http://localhost:2000/create-user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(registerData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log(data)
+            setRegisterMessage(data.message);
         });
-        const data = await response.json();
-        console.log(registerData);
-        console.log("Register response: ", data);
     };
 
     const handleLoginSubmit = async (e: any) => {
         e.preventDefault();
-        const response = await fetch("http://localhost:4000/authenticate", {
+        fetch("http://localhost:2000/login-auth", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify(loginData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.loggedIn) {
+                setLoggedIn(true);
+            } else {
+                setLoginMessage(data.message);
+            }
         });
-        const data = await response.json();
-
-        console.log(loginData);
-        console.log("Login response: ", data);
     };
 
     return (
@@ -46,6 +60,7 @@ export default function LoginPage() {
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                 />
                 <button type="submit" className="submitBtn">Register</button>
+                <span id="registerResponse">{registerMessage}</span>
             </form>
 
             <form id="loginForm" className="form" onSubmit={handleLoginSubmit}>
@@ -63,6 +78,7 @@ export default function LoginPage() {
                     onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                 />
                 <button type="submit" className="submitBtn">Log In</button>
+                <span id="loginResponse">{loginMessage}</span>
             </form>
         </div>
     );
