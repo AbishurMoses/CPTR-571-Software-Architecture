@@ -196,26 +196,11 @@ app.listen(PORT, () => {
   console.log(`Example app listening on PORT ${PORT}`)
 })
 
-// Validates that a token was created using the private key.
-function validateToken(token) {
-  try {
-    const payload = jwt.verify(token, JWT_PUBLIC_KEY, {
-      algorithms: ["RS256"]
-    });
-
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
 async function validateOrRefresh(req, res, next) {
   const refreshToken = req.cookies.refresh_token;
   const accessToken = req.cookies.access_token;
-  console.log("Starting token validation middleware")
 
   if (!refreshToken || !accessToken) {
-    console.log("Tokens not found")
     return res.json({ loggenIn: false });
   }
 
@@ -251,7 +236,6 @@ async function validateOrRefresh(req, res, next) {
       sameSite: "lax",
       maxAge: 1000*60*10
     });
-    console.log("New access token created.");
 
     const newPayload = jwt.verify(data.accessToken, JWT_PUBLIC_KEY, {
       algorithms: ["RS256"]
