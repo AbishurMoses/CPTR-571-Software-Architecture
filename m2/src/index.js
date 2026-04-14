@@ -27,56 +27,66 @@ const orm = await MikroORM.init({
 
 await orm.schema.update();
 
-// Attach a fresh Entity Manager to every request
 app.use((req, res, next) => {
     req.em = orm.em.fork();
     next();
 });
 
-// ── Epic GraphQL helper ───────────────────────────────────────────────────────
-// Epic doesn't have an official public API, but their storefront exposes a
-// GraphQL endpoint that the website uses.
-const EPIC_GRAPHQL_URL = 'https://store.epicgames.com/graphql';
+// ── IGDB / Twitch auth ────────────────────────────────────────────────────────
+// IGDB is a free game database owned by Twitch.
+// It has an "external_games" table that maps games to their Epic store IDs.
+// Credentials come from dev.twitch.tv — set these in your .env.dev:
+//   TWITCH_CLIENT_ID=your_client_id
+//   TWITCH_CLIENT_SECRET=your_client_secret
 
-async function fetchEpicGamesPage(cursor = '') {
-    const query = `
-        query searchStoreQuery($cursor: String) {
-            Catalog {
-                searchStore(
-                    category: "games/edition/base|bundles/games|editors"
-                    count: 40
-                    after: $cursor
-                    sortBy: "releaseDate"
-                    sortDir: "DESC"
-                    releaseDate: "[2000-01-01,]"
-                ) {
-                    elements {
-                        id
-                        title
-                        releaseDate
-                    }
-                    paging {
-                        count
-                        total
-                        pageCount
-                    }
-                }
-            }
-        }
-    `;
+let igdbToken = null;
+let igdbTokenExpiry = 0;
 
-    const response = await fetch(EPIC_GRAPHQL_URL, {
+async function getIGDBToken() {
+    // Reuse token if still valid
+    if (igdbToken && Date.now() < igdbTokenExpiry) {
+        return igdbToken;
+    }
+
+    const res = await fetch(
+        `https://id.twitch.tv/oauth2/token?client_id=${process.env.TWITCH_CLIENT_ID}&client_secret=${process.env.TWITCH_CLIENT_SECRET}&grant_type=client_credentials`,
+        { method: 'POST' }
+    );
+
+    if (!res.ok) {
+        throw new Error(`Failed to get IGDB token: ${res.status} — check your TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET in .env.dev`);
+    }
+
+    const data = await res.json();
+    igdbToken = data.access_token;
+    igdbTokenExpiry = Date.now() + (data.expires_in - 60) * 1000; // refresh 1 min early
+    return igdbToken;
+}
+
+// Fetch one page of Epic Games Store entries from IGDB
+// category 26 = Epic Games Store
+async function fetchEpicGamesPage(offset = 0) {
+    const token = await getIGDBToken();
+
+    const response = await fetch('https://api.igdb.com/v4/external_games', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { cursor } }),
+        headers: {
+            'Client-ID': process.env.TWITCH_CLIENT_ID,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'text/plain',
+        },
+        body: `fields uid, name, game, updated_at, category;
+               where category = 26;
+               limit 500;
+               offset ${offset};
+               sort updated_at desc;`,
     });
 
     if (!response.ok) {
-        throw new Error(`Epic API responded with ${response.status}`);
+        throw new Error(`IGDB API responded with ${response.status}`);
     }
 
-    const json = await response.json();
-    return json.data?.Catalog?.searchStore;
+    return await response.json();
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -90,43 +100,35 @@ app.get('/health', (req, res) => {
 });
 
 // Seed all Epic games into the database
-// Call this once (or periodically) to populate your DB.
+// Call this once to populate your DB, then use /epic-all-games to serve data
 // Usage: GET /seed-all-games
 app.get('/seed-all-games', async (req, res) => {
     const HARDCODED_ID = 1;
-    let cursor = '';
+    const PAGE_SIZE = 500;
+    let offset = 0;
     let totalFetched = 0;
-    let pagesFetched = 0;
 
     try {
-        // Keep fetching pages until Epic has no more results
         while (true) {
-            const storeData = await fetchEpicGamesPage(cursor);
-            const elements = storeData?.elements || [];
+            const entries = await fetchEpicGamesPage(offset);
 
-            if (elements.length === 0) break;
+            if (!entries || entries.length === 0) break;
 
-            // Map Epic fields
-            const games = elements.map(g => ({
-                id: g.id,
-                name: g.title,
-                lastModified: g.releaseDate
-                    ? Math.floor(new Date(g.releaseDate).getTime() / 1000)
-                    : null,
+            const games = entries.map(g => ({
+                id: g.uid,        // Epic's store ID for the game
+                name: g.name,
+                lastModified: g.updated_at ?? null,
             }));
 
             await req.em.upsertMany('Game', games);
 
-            totalFetched += elements.length;
-            pagesFetched++;
+            totalFetched += entries.length;
+            console.log(`Seeded ${totalFetched} Epic games so far...`);
 
-            // Epic uses cursor-based pagination.
-            // pageCount * 40 tells us if there are more pages.
-            const { count, total } = storeData.paging;
-            if (totalFetched >= total || elements.length < 40) break;
+            // IGDB returns fewer than PAGE_SIZE when we've hit the end
+            if (entries.length < PAGE_SIZE) break;
 
-            // Move cursor forward by the number of items fetched so far
-            cursor = String(totalFetched);
+            offset += PAGE_SIZE;
         }
 
         // Update sync timestamp
@@ -145,7 +147,6 @@ app.get('/seed-all-games', async (req, res) => {
         res.json({
             status: 'success',
             total_fetched: totalFetched,
-            pages_fetched: pagesFetched,
             message: 'Full Epic catalog retrieved successfully',
         });
     } catch (error) {
@@ -156,7 +157,7 @@ app.get('/seed-all-games', async (req, res) => {
 
 // Return a paginated list of Epic games from the DB
 // Usage: GET /epic-all-games?page=1
-// Gateway calls this for /fetch-all-games
+// This is what the gateway calls for /fetch-all-games
 app.get('/epic-all-games', async (req, res) => {
     const PAGE_SIZE = 40;
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -184,54 +185,62 @@ app.get('/epic-all-games', async (req, res) => {
 // Get details for a single Epic game by its ID
 // Usage: GET /game/:id
 app.get('/game/:id', async (req, res) => {
-    const gameId = req.params.id;
-
-    const query = `
-        query getGameDetails($id: String!) {
-            Catalog {
-                catalogOffer(id: $id, namespace: "epic") {
-                    id
-                    title
-                    description
-                    keyImages {
-                        type
-                        url
-                    }
-                    seller {
-                        name
-                    }
-                    releaseDate
-                }
-            }
-        }
-    `;
+    const epicId = req.params.id;
 
     try {
-        const response = await fetch(EPIC_GRAPHQL_URL, {
+        const token = await getIGDBToken();
+
+        // Step 1: find the IGDB game ID from the Epic store ID
+        const extRes = await fetch('https://api.igdb.com/v4/external_games', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, variables: { id: gameId } }),
+            headers: {
+                'Client-ID': process.env.TWITCH_CLIENT_ID,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'text/plain',
+            },
+            body: `fields uid, name, game; where category = 26 & uid = "${epicId}"; limit 1;`,
         });
 
-        const json = await response.json();
-        const offer = json.data?.Catalog?.catalogOffer;
+        const extData = await extRes.json();
 
-        if (offer) {
-            const headerImage = offer.keyImages?.find(img => img.type === 'DieselStoreFrontWide')?.url
-                ?? offer.keyImages?.[0]?.url
-                ?? null;
-
-            res.json({
-                id: offer.id,
-                name: offer.title,
-                description: offer.description,
-                header_image: headerImage,
-                developers: offer.seller?.name ? [offer.seller.name] : [],
-                releaseDate: offer.releaseDate,
-            });
-        } else {
-            res.status(404).json({ error: 'Game not found in Epic storefront' });
+        if (!extData || extData.length === 0) {
+            return res.status(404).json({ error: 'Game not found in Epic store' });
         }
+
+        const igdbGameId = extData[0].game;
+
+        // Step 2: fetch full game details using the IGDB game ID
+        const gameRes = await fetch('https://api.igdb.com/v4/games', {
+            method: 'POST',
+            headers: {
+                'Client-ID': process.env.TWITCH_CLIENT_ID,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'text/plain',
+            },
+            body: `fields name, summary, cover.url, involved_companies.company.name, genres.name, first_release_date;
+                   where id = ${igdbGameId};
+                   limit 1;`,
+        });
+
+        const gameData = await gameRes.json();
+        const game = gameData[0];
+
+        if (!game) {
+            return res.status(404).json({ error: 'Game details not found' });
+        }
+
+        res.json({
+            id: epicId,
+            name: game.name,
+            description: game.summary ?? null,
+            // IGDB returns small thumbnails by default — replace with big cover
+            header_image: game.cover?.url?.replace('t_thumb', 't_cover_big') ?? null,
+            developers: game.involved_companies?.map(ic => ic.company.name) ?? [],
+            genres: game.genres?.map(g => g.name) ?? [],
+            releaseDate: game.first_release_date
+                ? new Date(game.first_release_date * 1000).toISOString()
+                : null,
+        });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch game details', details: error.message });
     }
