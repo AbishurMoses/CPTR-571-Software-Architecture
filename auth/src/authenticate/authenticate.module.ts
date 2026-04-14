@@ -2,17 +2,16 @@ import { Module } from '@nestjs/common';
 import { AuthenticateService } from './authenticate.service';
 import { AuthenticateController } from './authenticate.controller';
 import { JwtModule } from '@nestjs/jwt';
-import * as fs from 'fs';
 
 @Module({
   controllers: [AuthenticateController],
   providers: [AuthenticateService],
   imports: [
     JwtModule.register({
-      privateKey: fs.readFileSync('private.key'),
+      privateKey: process.env.JWT_PRIVATE_KEY,
+      publicKey: process.env.JWT_PUBLIC_KEY,
       signOptions: {
         algorithm: 'RS256',
-        expiresIn: '15m',
       }
     })
   ],

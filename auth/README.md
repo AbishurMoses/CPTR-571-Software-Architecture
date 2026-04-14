@@ -4,6 +4,27 @@ This microservice handles user account creation and authentication. It uses Next
 
 It runs on port 4000.
 
+Required lines for the environment file:
+
+```
+# Internal Docker network connection
+DB_HOST=auth-db
+DB_PORT=5432
+DB_USER=user_dev
+DB_NAME=db
+DB_PASSWORD=devpassword
+
+# Creating POSTGRES instance with these values
+POSTGRES_ROOT_PASSWORD=secure_pass
+POSTGRES_USER=user_dev             
+POSTGRES_PASSWORD=devpassword
+POSTGRES_DB=db
+
+#JWT keys
+JWT_PRIVATE_KEY="..." # Paste the entire key in quotes
+JWT_PUBLIC_KEY="..." # Paste the entire key in quotes
+```
+
 ## Health service
 
 Retrieve system health request:
@@ -60,7 +81,7 @@ Create user response:
 ```
 
 ## Authentication service
-If a username and password match, a JWT token is generated using the private key and returned. This must be decrypted with the public key and checked before performing protected actions.
+If a username and password match, a refresh token and an access token are returned as JWTs using RS256 encoding.
 
 Authenticate user request:
 ```
@@ -75,12 +96,40 @@ Authenticate user response:
 ```
 // If successful
 {
-  "token": "eyJhbGciOiJSU..."
+  "accessToken": "...",
+  "refreshToken": "..."
 }
 
 // If unsuccessful
 {
   "message": "Invalid username or password",
+  "error": "Unauthorized",
+  "statusCode": 401
+}
+```
+
+The refresh endpoint generates a new access token when the previous one expires. It accepts a refresh token and validates it with the public key to make sure that it was created using the private key. Then, it decodes it and uses the **sub** field (the user id) to get the user information. Finally, it encodes the user's information into another access token.
+
+This is used in the dual cookie authentication setup to maintain short lived access tokens that can be refreshed for as long as the refresh token stays alive. User's can't forge these tokens due to the RS256 signing.
+
+Refresh request:
+```
+POST /refresh
+{
+  "refreshToken": "..."
+}
+```
+
+Refresh response:
+```
+// If successful
+{
+  "accessToken": "..."
+}
+
+// If unsuccessful
+{
+  "message": "Invalid refresh token",
   "error": "Unauthorized",
   "statusCode": 401
 }
