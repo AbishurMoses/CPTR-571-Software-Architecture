@@ -11,6 +11,9 @@ export class User {
     @Property()
     password!: string;
 
+    @Property({ default: 0 })
+    highscore!: number;
+
     @Property({ nullable: true })
     role?: number;
 

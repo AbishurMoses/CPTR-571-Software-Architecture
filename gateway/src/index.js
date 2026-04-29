@@ -24,10 +24,10 @@ app.use(cors({
 
 app.get('/health', (req, res) => {
   res.json({
-    message: "Gateway is workinggggg",
+    message: "Gateway is working",
     port: PORT
   });
-}) 
+})
 
 app.post('/login-auth', async (req, res) => {
   const { username, password } = req.body;
@@ -52,13 +52,13 @@ app.post('/login-auth', async (req, res) => {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 1000*60*10 // 10 minute JWT lifespan
+      maxAge: 1000 * 60 * 10 // 10 minute JWT lifespan
     });
     res.cookie("refresh_token", data.refreshToken, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 1000*60*60*24 // 1 day refresh token lifespan
+      maxAge: 1000 * 60 * 60 * 24 // 1 day refresh token lifespan
     });
 
     return res.json({ loggedIn: true });
@@ -132,7 +132,9 @@ app.get('/health-all', async (req, res) => {
       .then(r => r.ok ? 'OK' : 'NO')
       .catch(() => 'NO');
 
-    const epicFetch = Promise.resolve('NO');
+    const epicFetch = fetch('http://m2:5000/health')
+      .then(r => r.ok ? 'OK' : 'NO')
+      .catch(() => 'NO');
 
     const [steamStatus, epicStatus] = await Promise.all([steamFetch, epicFetch]);
 
@@ -143,6 +145,27 @@ app.get('/health-all', async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: "Could not aggregate health reports" });
+  }
+});
+
+app.get('/steam-game/:id', async (req, res) => {
+  const id = req.params.id; 
+  
+  try {
+    const steamResponse = await fetch(`http://m1:3000/game/${id}`);
+    const gameData = await steamResponse.json();
+
+    if (steamResponse.ok) {
+      res.json(gameData);
+    } else {
+      res.status(steamResponse.status).json({ 
+        error: "Steam service could not find the game",
+        details: gameData.error 
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Gateway failed to connect to Steam service", details: err.message });
   }
 });
 
@@ -234,7 +257,7 @@ async function validateOrRefresh(req, res, next) {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 1000*60*10
+      maxAge: 1000 * 60 * 10
     });
 
     const newPayload = jwt.verify(data.accessToken, JWT_PUBLIC_KEY, {
