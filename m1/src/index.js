@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { MikroORM } from '@mikro-orm/postgresql';
 import { Game } from './entities/Game.js';
 import { Metadata } from './entities/Metadata.js';
+import { Review } from './entities/Review.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,7 @@ const app = express();
 const PORT = process.env.API_PORT;
 
 const orm = await MikroORM.init({
-    entities: [Game, Metadata],
+    entities: [Game, Metadata, Review],
     dbName: process.env.DB_NAME,
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
@@ -38,6 +39,7 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Fetch all game ids
 app.get('/seed-all-games', async (req, res) => {
     let allGames = [];
     let lastAppId = 0;
@@ -99,52 +101,7 @@ app.get('/seed-all-games', async (req, res) => {
     }
 });
 
-app.get('/seed-updates', async (req, res) => {
-    const em = req.em;
-    const now = Math.floor(Date.now() / 1000);
-    const HARDCODED_ID = 1
-    try {
-        let meta = await em.findOne('Metadata', { id: HARDCODED_ID });
-
-        const oneWeek = 7 * 24 * 60 * 60
-        const oneWeekAgo = now - oneWeek
-        const sinceTimestamp = meta ? meta.lastSyncTimestamp : oneWeekAgo;
-
-        const url = `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${process.env.STEAM_API_KEY}&include_games=true&if_modified_since=${sinceTimestamp}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-        const games = data.response?.apps || [];
-
-        if (games.length > 0) {
-            await em.upsertMany(Game, games.map(g => ({
-                appId: g.appid,
-                name: g.name,
-                lastModified: g.last_modified,
-            })));
-
-            if (!meta) {
-                meta = em.create('Metadata', { lastSyncTimestamp: now });
-                em.persist(meta);
-            } else {
-                meta.lastSyncTimestamp = now;
-            }
-
-            await em.flush();
-        }
-
-        res.json({
-            status: "success",
-            message: `Synced ${games.length} updates since ${new Date(sinceTimestamp * 1000).toLocaleString()}`,
-            count: games.length
-        });
-
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Update fetch failed", details: e.message });
-    }
-});
-
+// get info on game by id
 app.get('/game/:id', async (req, res) => {
     const appId = req.params.id;
     const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
@@ -172,6 +129,50 @@ app.get('/game/:id', async (req, res) => {
     }
 });
 
+// get review for game by id
+app.get('/review/:id', async (req, res) => {
+    const appId = req.params.id;
+    const cursor = req.query.cursor || '*';
+    const encodedCursor = encodeURIComponent(cursor);
+
+    const url = `https://store.steampowered.com/appreviews/${appId}?json=1&cursor=${encodedCursor}&num_per_page=20&language=all`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data && data.success === 1) {
+            const summary = data.query_summary;
+
+            const totalReviews = summary?.total_reviews || 0;
+            const totalPositive = summary?.total_positive || 0;
+            const positivePercentage = totalReviews > 0
+                ? ((totalPositive / totalReviews) * 100).toFixed(2)
+                : 0;
+
+            res.json({
+                score_description: summary?.review_score_desc || "No reviews yet",
+                positive_percentage: Number(positivePercentage),
+                total_reviews: totalReviews,
+                total_positive: totalPositive,
+                total_negative: summary?.total_negative || 0,
+                next_cursor: data.cursor,
+                reviews: data.reviews ? data.reviews.map(r => ({
+                    text: r.review,
+                    is_positive: r.voted_up,
+                    author_playtime: r.author?.playtime_forever
+                })) : []
+            });
+        } else {
+            res.status(404).json({ error: "Steam API failed to return review data" });
+        }
+    } catch (e) {
+        console.error("Review Fetch Error:", e);
+        res.status(500).json({ error: "Server error fetching reviews" });
+    }
+});
+
+// --- FROM DB --- //
 app.get('/steam-all-games', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = 50;
@@ -188,6 +189,150 @@ app.get('/steam-all-games', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch games", details: error.message });
+    }
+});
+
+app.get('/prefetch-reviews', async (req, res) => {
+    const TARGET = 100;
+    const MIN_REVIEWS = 10;
+    const MAX_ATTEMPTS = 50;
+    const em = req.em;
+
+    try {
+        const totalGames = await em.count(Game);
+        if (totalGames === 0) {
+            return res.status(400).json({
+                error: 'No games in database. Run /seed-all-games first.'
+            });
+        }
+
+        const pickedThisRequest = new Set();
+        const results = [];
+
+        for (let i = 0; i < TARGET; i++) {
+            let stored = null;
+
+            for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                const offset = Math.floor(Math.random() * totalGames);
+                const [candidate] = await em.find(Game, {}, { limit: 1, offset });
+                if (!candidate) continue;
+                if (pickedThisRequest.has(candidate.appId)) continue;
+
+                const exists = await em.findOne(Review, { gameId: candidate.appId });
+                if (exists) continue;
+
+                pickedThisRequest.add(candidate.appId);
+
+                let data;
+                try {
+                    const url = `https://store.steampowered.com/appreviews/${candidate.appId}?json=1&language=all&purchase_type=all`;
+                    const response = await fetch(url);
+                    data = await response.json();
+                } catch (fetchErr) {
+                    continue;
+                }
+
+                if (!data || data.success !== 1) continue;
+
+                const summary = data.query_summary || {};
+                const totalReviews = summary.total_reviews ?? 0;
+                const positiveReviews = summary.total_positive ?? 0;
+
+                if (totalReviews < MIN_REVIEWS) continue;
+
+                const review = em.create(Review, {
+                    gameId: candidate.appId,
+                    title: candidate.name,
+                    totalReviews,
+                    market: 'steam',
+                    positiveReviews,
+                });
+                em.persist(review);
+
+                stored = {
+                    gameId: candidate.appId,
+                    title: candidate.name,
+                    market: 'steam',
+                    totalReviews,
+                    positiveReviews,
+                };
+                break;
+            }
+
+            if (stored) {
+                results.push(stored);
+            } else {
+                results.push({
+                    error: `Could not find a qualifying game (>= ${MIN_REVIEWS} reviews) after ${MAX_ATTEMPTS} attempts`
+                });
+            }
+        }
+
+        await em.flush();
+
+        res.json({
+            status: 'success',
+            requested: TARGET,
+            stored: results.filter(r => !r.error).length,
+            results
+        });
+    } catch (error) {
+        console.error('Prefetch reviews failed:', error);
+        res.status(500).json({ error: 'Prefetch reviews failed', details: error.message });
+    }
+});
+
+app.get('/random-review', async (req, res) => {
+    const count = Math.max(1, Math.min(100, parseInt(req.query.count) || 1));
+
+    try {
+        const rows = await req.em.getConnection().execute(
+            `SELECT game_id, title, market, total_reviews, positive_reviews
+             FROM review
+             ORDER BY random()
+             LIMIT ?`,
+            [count]
+        );
+
+        if (rows.length === 0) {
+            return res.status(400).json({
+                error: 'Review pool is empty. Run /prefetch-reviews first.'
+            });
+        }
+
+        const results = await Promise.all(rows.map(async (r) => {
+            let headerImage = null;
+            const appId = r.game_id;
+
+            try {
+                const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data[appId]?.success) {
+                    headerImage = data[appId].data.header_image;
+                }
+            } catch (e) {
+                console.error(`Failed to fetch image for game ${appId}:`, e.message);
+            }
+
+            return {
+                gameId: r.game_id,
+                title: r.title,
+                market: r.market,
+                totalReviews: r.total_reviews,
+                positiveReviews: r.positive_reviews,
+                header_image: headerImage // Appending the image here
+            };
+        }));
+
+        res.json({
+            count: results.length,
+            results
+        });
+    } catch (error) {
+        console.error('Random review failed:', error);
+        res.status(500).json({ error: 'Random review failed', details: error.message });
     }
 });
 

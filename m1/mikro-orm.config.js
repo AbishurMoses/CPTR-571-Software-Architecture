@@ -1,6 +1,7 @@
 import { defineConfig } from '@mikro-orm/postgresql';
 import { Game } from './src/entities/Game.js';
 import { Metadata } from './src/entities/Metadata.js';
+import { Review } from './src/entities/Review.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,7 +12,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env.dev') });
 
 export default defineConfig({
-    entities: [Game, Metadata],
+    entities: [Game, Metadata, Review],
     dbName: process.env.DB_NAME,
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
