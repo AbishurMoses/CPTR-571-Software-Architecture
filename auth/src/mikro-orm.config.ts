@@ -14,5 +14,8 @@ export default defineConfig({
     connection: {
       statement_timeout: 5000,
     },
+  },
+  migrations: {
+    path: '../migrations'
   }
 });

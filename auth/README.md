@@ -43,6 +43,7 @@ Retrieve system health response:
 ```
 
 ## User services
+#### User creation
 Usernames must be unique and passwords must be at least 6 characters long and contain at least one lowercase letter and a number. 
 
 An optional role can be added which defaults to 1 if missing. See permission definitions below:
@@ -80,7 +81,58 @@ Create user response:
 }
 ```
 
+#### Highscores
+When a user ends a game, their score can be sent to the auth service. If the "score" value in the body is higher than the one stored in the database, it will replace the one in the database and send back a different response.
+
+Update highscore request:
+```
+PATCH /users/:id/highscore
+{
+    "score": 12
+}
+```
+
+Update highscore response:
+```
+// If body score is higher than database score
+{
+    "score": 12,
+    "isNewHighscore": true
+}
+
+// If body score is higher than database score
+{
+    "score": 12,
+    "isNewHighscore": false
+}
+```
+
+#### Get leaderboard request
+This gets the top ten users with the highest scores. It filters out anyone with a highscore of 0.
+
+Get leaderboard body:
+```
+GET /users/leaderboard
+No body
+```
+
+Get leaderboard response:
+```
+[
+    {
+        "username": "User1",
+        "score": 12
+    },
+    {
+        "username": "User2",
+        "score": 8
+    },
+    ...
+]
+```
+
 ## Authentication service
+#### Authenticate a user
 If a username and password match, a refresh token and an access token are returned as JWTs using RS256 encoding.
 
 Authenticate user request:
@@ -108,6 +160,7 @@ Authenticate user response:
 }
 ```
 
+#### Refresh a user's access token
 The refresh endpoint generates a new access token when the previous one expires. It accepts a refresh token and validates it with the public key to make sure that it was created using the private key. Then, it decodes it and uses the **sub** field (the user id) to get the user information. Finally, it encodes the user's information into another access token.
 
 This is used in the dual cookie authentication setup to maintain short lived access tokens that can be refreshed for as long as the refresh token stays alive. User's can't forge these tokens due to the RS256 signing.
