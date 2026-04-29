@@ -1,8 +1,3 @@
-# m1 is microservice 1
-# m2 is microservice 2
-# auth is authentication/authorization
-# web is frontend
-
 services:
   web:
     build:
@@ -95,7 +90,6 @@ services:
       timeout: 5s
       retries: 5
 
-
   m1-db:
     image: postgres:18
     restart: always
@@ -112,6 +106,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  m2:
+    build:
+      context: ./m2
+      dockerfile: Dockerfile.dev
+    depends_on:
+      m2-db:
+        condition: service_healthy
+    restart: always
+    env_file:
+      - ./m2/.env.dev
+    ports:
+      - "5000:5000"
+    networks:
+      - m_network
 
   m2-db:
     image: postgres:18

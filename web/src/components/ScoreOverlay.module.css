@@ -1,0 +1,21 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px;
+  pointer-events: none;
+}
+
+.highScore,
+.score {
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
