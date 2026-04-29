@@ -1,73 +1,38 @@
-# React + TypeScript + Vite
+# Web — Higher or Lower Game
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite frontend for a "Higher or Lower" guessing game.
 
-Currently, two official plugins are available:
+## How It Works
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Two video game cards are shown side by side. Click the one you think has the higher review score. Correct guesses build a streak; incorrect guesses reset it. The winning card carries forward to the next round.
 
-## React Compiler
+## Project Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── types/game.ts              # GameData interface
+├── data/mockGames.ts          # 12 mock game entries
+├── services/
+│   ├── gameDataService.ts     # Random game selection logic
+│   └── apiService.ts          # Gateway API client (future)
+├── components/
+│   ├── GameBoard.tsx          # Main game container + state
+│   ├── GameCard.tsx           # Clickable half-screen card
+│   ├── ORDivider.tsx          # "OR" circle between cards
+│   └── ScoreOverlay.tsx       # Score + high score display
+└── pages/
+    ├── HomePage.tsx            # Renders GameBoard
+    └── LoginPage.tsx           # Login screen
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Running
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+yarn dev
 ```
+
+Opens at `http://localhost:5173`. Requires the Gateway (`localhost:2000`) for login — or set `loggedIn` to `true` in `App.tsx` to bypass.
+
+## Data Layer
+
+Currently uses mock data. When the Gateway is ready, swap `gameDataService.ts` to call `apiService.fetchAllGames()` — no UI changes needed.

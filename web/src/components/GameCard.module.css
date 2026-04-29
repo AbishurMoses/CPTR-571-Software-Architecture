@@ -1,0 +1,37 @@
+.card {
+  position: relative;
+  width: 50%;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card.disabled {
+  pointer-events: none;
+}
+
+.card.correct {
+  box-shadow: inset 0 0 0 6px #22c55e;
+}
+
+.card.incorrect {
+  box-shadow: inset 0 0 0 6px #ef4444;
+}
+
+.titleLabel {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 12px 24px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111;
+  border-radius: 4px;
+  text-align: center;
+  max-width: 80%;
+  z-index: 1;
+}
