@@ -1,5 +1,6 @@
 import { useState } from "react"
 import '../styles/login.css'
+import Leaderboard from "../components/Leaderboard";
 
 interface LoginPageProps {
     setLoggedIn: (value: boolean) => void;
@@ -95,6 +96,8 @@ export default function LoginPage({ setLoggedIn }: LoginPageProps) {
                     <span id="loginResponse">{loginMessage}</span>
                 </form>
             </div>
+
+            <Leaderboard></Leaderboard>
         </>
     );
 }

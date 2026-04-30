@@ -94,7 +94,7 @@ app.post('/create-user', async (req, res) => {
     const data = await response.json();
 
     switch (response.status) {
-      case 200:
+      case 201:
         res.json({
           message: 'Your account has been created. Please log in below.'
         });
@@ -121,6 +121,27 @@ app.post('/create-user', async (req, res) => {
         });
         break;
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/leaderboard', async (req, res) => {
+  try {
+    const response = await fetch('http://auth:4000/users/leaderboard', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(500).json({ message: 'Something went wrong.' });
+    }
+
+    const data = await response.json();
+
+    res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

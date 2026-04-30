@@ -12,7 +12,6 @@ body {
 .loginSwitch, .registerSwitch {
     width: 100px;
     height: 30px;
-    /* text-align: center; */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -22,6 +21,7 @@ body {
     background-color: #999999;
     cursor: default;
     transition: background-color .2s, height .2s, border-radius .2s;
+    user-select: none;
 }
 .loginSwitch:hover:not(.selectedSwitch), .registerSwitch:hover:not(.selectedSwitch) {
     background-color: #888888;
@@ -41,7 +41,7 @@ body {
 #formGroup {
     position: relative;
     overflow: hidden;
-    border: 2px solid black;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
     border-radius: 7px;
     width: 500px;
     height: 300px;
