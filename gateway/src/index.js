@@ -191,14 +191,12 @@ app.get('/random-games', async (req, res) => {
     }
 
     if (platform === 'epic') {
-      // TODO: Epic games service (m2) does not yet have a /random-review endpoint.
-      // When m2 is ready, replace this block with a fetch to http://m2:5000/random-review?count=${count}
-      // and return the data in the same shape as Steam's response:
-      // { count: number, results: [{ gameId, title, market, totalReviews, positiveReviews, header_image }] }
-      return res.status(503).json({
-        error: 'Epic Games platform is not yet available.',
-        message: 'The Epic service does not currently support review data. Check back later.'
-      });
+      const response = await fetch(`http://m2:5000/random-review?count=${count}`);
+      if (!response.ok) {
+        return res.status(response.status).json({ error: 'Epic service failed to return games' });
+      }
+      const data = await response.json();
+      return res.json(data);
     }
 
     return res.status(400).json({ error: `Unknown platform: ${platform}` });
