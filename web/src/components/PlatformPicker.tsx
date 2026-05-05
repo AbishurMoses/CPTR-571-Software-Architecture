@@ -27,16 +27,13 @@ export default function PlatformPicker({ onSelect, loading }: PlatformPickerProp
           >
             Steam
           </button>
-          {/* TODO: Remove epicDisabled class and enable onClick when Epic (m2) has review data */}
           <button
-            className={`${styles.btn} ${styles.epic} ${styles.epicDisabled}`}
-            disabled={true} // TODO: Change to {loading} when Epic is working
-            aria-label="Play with Epic Games (coming soon)"
-            // TODO: Uncomment when Epic is ready:
-            // onClick={() => onSelect("epic")}
+            className={`${styles.btn} ${styles.epic}`}
+            onClick={() => onSelect("epic")}
+            disabled={loading}
+            aria-label="Play with Epic Games"
           >
             Epic Games
-            <span className={styles.comingSoon}>Coming Soon</span>
           </button>
         </div>
       </div>

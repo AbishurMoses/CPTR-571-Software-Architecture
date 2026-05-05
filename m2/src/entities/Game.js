@@ -6,6 +6,7 @@ export const Game = new EntitySchema({
     id: { primary: true, type: 'string' },
     name: { type: 'string', length: 1024 },
     namespace: { type: 'string', length: 255, nullable: true },
+    productSlug: { type: 'string', length: 512, nullable: true },
     lastModified: { type: 'number', nullable: true },
     description: { type: 'text', nullable: true },
     headerImage: { type: 'string', length: 2048, nullable: true },

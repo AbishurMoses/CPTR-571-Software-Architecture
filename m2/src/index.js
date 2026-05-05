@@ -26,7 +26,10 @@ const orm = await MikroORM.init({
     debug: true,
 });
 
-await orm.schema.update();
+await orm.schema.ensureDatabase();
+// NOTE: schema creation is owned by the seeder scripts in m2/scripts.
+// We intentionally skip schema.update() here because it downcasts our
+// NUMERIC rating columns back to INTEGER, which breaks fractional IGDB scores.
 
 app.use((req, res, next) => {
     req.em = orm.em.fork();
@@ -64,6 +67,7 @@ app.get('/epic-all-games', async (req, res) => {
             data: games.map(g => ({
                 id: g.id,
                 name: g.name,
+                productSlug: g.productSlug,
                 description: g.description,
                 header_image: g.headerImage,
                 developer: g.developer,
@@ -101,6 +105,7 @@ app.get('/game/:id', async (req, res) => {
         res.json({
             id: game.id,
             name: game.name,
+            productSlug: game.productSlug,
             description: game.description,
             header_image: game.headerImage,
             developer: game.developer,
@@ -154,7 +159,9 @@ app.get('/game/:id/reviews', async (req, res) => {
 // Usage: GET /prefetch-reviews
 app.get('/prefetch-reviews', async (req, res) => {
     const TARGET = 100;
-    const MIN_REVIEWS = 10;
+    // Keep this low while the DB is partially seeded — IGDB review counts
+    // are tiny for brand-new Epic releases. Raise for production.
+    const MIN_REVIEWS = 1;
     const MAX_ATTEMPTS = 50;
     const em = req.em;
 
@@ -193,16 +200,22 @@ app.get('/prefetch-reviews', async (req, res) => {
                 const reviewData = await em.findOne(Review, { gameId: candidate.id });
                 if (!reviewData) continue;
 
-                // Use IGDB rating as the score — need at least one rating source
-                const hasRating = reviewData.igdbRating != null || reviewData.igdbAggregatedRating != null;
+                // Use IGDB rating as the score — need at least one rating source.
+                // Decimal columns come back as strings from Postgres, so normalize.
+                const userRating = reviewData.igdbRating != null ? Number(reviewData.igdbRating) : null;
+                const aggRating = reviewData.igdbAggregatedRating != null ? Number(reviewData.igdbAggregatedRating) : null;
+                const userCount = reviewData.igdbRatingCount != null ? Number(reviewData.igdbRatingCount) : 0;
+                const aggCount = reviewData.igdbAggregatedRatingCount != null ? Number(reviewData.igdbAggregatedRatingCount) : 0;
+
+                const hasRating = userRating != null || aggRating != null;
                 if (!hasRating) continue;
 
-                // Use igdbRatingCount as totalReviews, fall back to aggregated count
-                const totalReviews = reviewData.igdbRatingCount ?? reviewData.igdbAggregatedRatingCount ?? 0;
+                // Combine user and critic counts so the pool has more variability.
+                const totalReviews = userCount + aggCount;
                 if (totalReviews < MIN_REVIEWS) continue;
 
-                // Use igdbRating (0-100 user score) to derive positiveReviews
-                const score = reviewData.igdbRating ?? reviewData.igdbAggregatedRating ?? 0;
+                // Prefer the user score, fall back to critic, then derive positive count.
+                const score = userRating ?? aggRating ?? 0;
                 const positiveReviews = Math.round((score / 100) * totalReviews);
 
                 // Check if already in prefetch pool
@@ -290,6 +303,7 @@ app.get('/random-review', async (req, res) => {
                 totalReviews: r.total_reviews,
                 positiveReviews: r.positive_reviews,
                 header_image: game?.headerImage ?? null,
+                productSlug: game?.productSlug ?? null,
             };
         }));
 

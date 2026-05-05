@@ -249,50 +249,69 @@ app.get('/steam-game/:id', async (req, res) => {
   }
 });
 
-app.get('/fetch-all-games', async (req, res) => {
-  const page = req.query.page || 1;
-  const targetUrl = `http://m1:3000/steam-all-games?page=${page}`;
-
-  console.log(`Gateway is attempting to fetch: ${targetUrl}`);
+app.get('/epic-game/:id', async (req, res) => {
+  const id = req.params.id;
 
   try {
-    const steamResponse = await fetch(targetUrl);
-    if (!steamResponse.ok) {
-      throw new Error(`Steam service responded with ${steamResponse.status}`);
+    const epicResponse = await fetch(`http://m2:5000/game/${id}`);
+    const gameData = await epicResponse.json();
+
+    if (epicResponse.ok) {
+      res.json(gameData);
+    } else {
+      res.status(epicResponse.status).json({
+        error: "Epic service could not find the game",
+        details: gameData.error
+      });
     }
-    const steamData = await steamResponse.json();
-
-    const epicData = {
-      page: page,
-      total_pages: 0,
-      total_games: 0,
-      data: []
-    };
-
-    res.json([
-      {
-        source: "Steam Service",
-        currentPage: steamData.page,
-        totalPages: steamData.total_pages,
-        totalGames: steamData.total_games,
-        games: steamData.data
-      },
-      {
-        source: "Epic Service",
-        currentPage: epicData.page,
-        totalPages: epicData.total_pages,
-        totalGames: epicData.total_games,
-        games: epicData.data
-      }
-    ]);
-
-  } catch (error) {
-    console.error("Gateway error:", error.message);
-    res.status(500).json({
-      error: "Failed to aggregate games",
-      details: error.message
-    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Gateway failed to connect to Epic service", details: err.message });
   }
+});
+
+app.get('/fetch-all-games', async (req, res) => {
+  const page = req.query.page || 1;
+  const steamUrl = `http://m1:3000/steam-all-games?page=${page}`;
+  const epicUrl = `http://m2:5000/epic-all-games?page=${page}`;
+
+  console.log(`Gateway is attempting to fetch: ${steamUrl} and ${epicUrl}`);
+
+  // Run both upstream calls in parallel so a slow/failing one doesn't block the other.
+  const emptyEpic = { page, total_pages: 0, total_games: 0, data: [] };
+  const emptySteam = { page, total_pages: 0, total_games: 0, data: [] };
+
+  const [steamData, epicData] = await Promise.all([
+    fetch(steamUrl)
+      .then(r => r.ok ? r.json() : emptySteam)
+      .catch((err) => {
+        console.error('Steam fetch failed:', err.message);
+        return emptySteam;
+      }),
+    fetch(epicUrl)
+      .then(r => r.ok ? r.json() : emptyEpic)
+      .catch((err) => {
+        console.error('Epic fetch failed:', err.message);
+        return emptyEpic;
+      }),
+  ]);
+
+  res.json([
+    {
+      source: "Steam Service",
+      currentPage: steamData.page,
+      totalPages: steamData.total_pages,
+      totalGames: steamData.total_games,
+      games: steamData.data
+    },
+    {
+      source: "Epic Service",
+      currentPage: epicData.page,
+      totalPages: epicData.total_pages,
+      totalGames: epicData.total_games,
+      games: epicData.data
+    }
+  ]);
 });
 
 app.listen(PORT, () => {

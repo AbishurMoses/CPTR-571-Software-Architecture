@@ -32,6 +32,8 @@ export async function fetchRandomGames(
       reviews: g.totalReviews,
       gameId: g.gameId,
       market: g.market,
+      // Epic uses productSlug for its store URLs; Steam leaves it undefined
+      productSlug: g.productSlug ?? undefined,
     }));
 }
 

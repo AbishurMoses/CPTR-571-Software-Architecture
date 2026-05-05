@@ -72,7 +72,7 @@ export default function ExitPage({ game, finalScore, onPlayAgain, onLogout }: Ex
                   className={styles.storeLink}
                   href={
                     game.market === "epic"
-                      ? `https://store.epicgames.com/p/${game.gameId}` // TODO: Verify Epic URL format when m2 is working
+                      ? `https://store.epicgames.com/p/${game.productSlug ?? game.gameId}`
                       : `https://store.steampowered.com/app/${game.gameId}`
                   }
                   target="_blank"

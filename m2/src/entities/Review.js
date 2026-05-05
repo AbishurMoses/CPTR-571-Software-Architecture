@@ -5,9 +5,11 @@ export const Review = new EntitySchema({
   properties: {
     id: { primary: true, type: 'number', autoincrement: true },
     gameId: { type: 'string', length: 255 },
-    igdbRating: { type: 'number', nullable: true },              // user rating 0-100
-    igdbRatingCount: { type: 'number', nullable: true },
-    igdbAggregatedRating: { type: 'number', nullable: true },    // critic rating 0-100
-    igdbAggregatedRatingCount: { type: 'number', nullable: true },
+    // IGDB ratings are fractional (0–100 with decimals). Force the column
+    // type to NUMERIC so schema.update doesn't downcast back to INTEGER.
+    igdbRating: { type: 'number', columnType: 'numeric', nullable: true },
+    igdbRatingCount: { type: 'number', columnType: 'numeric', nullable: true },
+    igdbAggregatedRating: { type: 'number', columnType: 'numeric', nullable: true },
+    igdbAggregatedRatingCount: { type: 'number', columnType: 'numeric', nullable: true },
   },
 });
