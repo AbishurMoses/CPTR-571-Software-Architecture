@@ -5,11 +5,12 @@ interface GameCardProps {
   game: GameData;
   side: "left" | "right";
   feedback: null | { correct: boolean };
+  showReviews: boolean;
   disabled: boolean;
   onClick: () => void;
 }
 
-export default function GameCard({ game, side, feedback, disabled, onClick }: GameCardProps) {
+export default function GameCard({ game, side, feedback, showReviews, disabled, onClick }: GameCardProps) {
   const classNames = [
     styles.card,
     disabled ? styles.disabled : "",
@@ -37,6 +38,11 @@ export default function GameCard({ game, side, feedback, disabled, onClick }: Ga
       }}
     >
       <span className={styles.titleLabel}>{game.name}</span>
+      {showReviews && (
+        <span className={styles.reviewCount}>
+          {game.reviews.toLocaleString()} reviews
+        </span>
+      )}
     </div>
   );
 }

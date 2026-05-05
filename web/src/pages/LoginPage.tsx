@@ -1,12 +1,11 @@
 import { useState } from "react"
 import '../styles/login.css'
-import Leaderboard from "../components/Leaderboard";
 
 interface LoginPageProps {
-    setLoggedIn: (value: boolean) => void;
+    onLogin: (user: { id: number; username: string }) => void;
 }
 
-export default function LoginPage({ setLoggedIn }: LoginPageProps) {
+export default function LoginPage({ onLogin }: LoginPageProps) {
     const [loginRegisterSwitch, setLoginRegisterSwitch] = useState("login");
     const [registerData, setRegisterData] = useState({ username: "", password: "" });
     const [loginData, setLoginData] = useState({ username: "", password: "" });
@@ -42,7 +41,7 @@ export default function LoginPage({ setLoggedIn }: LoginPageProps) {
         .then(res => res.json())
         .then(data => {
             if (data.loggedIn) {
-                setLoggedIn(true);
+                onLogin(data.user);
             } else {
                 setLoginMessage(data.message);
             }
@@ -51,7 +50,7 @@ export default function LoginPage({ setLoggedIn }: LoginPageProps) {
 
     return (
         <>
-            <h1 style={{paddingTop: "50px"}}>The Whatever It's Called Game!</h1>
+            <h1 style={{paddingTop: "50px"}}>The Higher or Lower Game!</h1>
             <h3 style={{paddingBottom: "30px"}}>To play, log in or register below.</h3>
 
             <div className="switchContainer">
@@ -97,7 +96,6 @@ export default function LoginPage({ setLoggedIn }: LoginPageProps) {
                 </form>
             </div>
 
-            <Leaderboard></Leaderboard>
         </>
     );
 }

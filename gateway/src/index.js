@@ -61,14 +61,14 @@ app.post('/login-auth', async (req, res) => {
       maxAge: 1000 * 60 * 60 * 24 // 1 day refresh token lifespan
     });
 
-    return res.json({ loggedIn: true });
+    return res.json({ loggedIn: true, user: { id: jwt.verify(data.accessToken, JWT_PUBLIC_KEY, { algorithms: ["RS256"] }).sub, username } });
   } catch (error) {
     res.status(200).json({ loggedIn: false, message: 'Something went wrong. Please try again later.' });
   }
 });
 
 app.post('/wakeup', validateOrRefresh, async (req, res) => {
-  return res.json({ loggedIn: true });
+  return res.json({ loggedIn: true, user: { id: req.user.sub, username: req.user.username } });
 });
 
 app.post('/create-user', async (req, res) => {
@@ -144,6 +144,67 @@ app.get('/leaderboard', async (req, res) => {
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+app.patch('/highscore', validateOrRefresh, async (req, res) => {
+  const userId = req.user.sub;
+  const score = Number(req.body.score);
+
+  if (!Number.isInteger(score) || score < 0) {
+    return res.status(400).json({ message: 'Score must be a non-negative integer.' });
+  }
+
+  try {
+    const response = await fetch(`http://auth:4000/users/${userId}/highscore`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    return res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Fetch random games with review data for the Higher/Lower game
+// ?count=10&platform=steam|epic
+app.get('/random-games', async (req, res) => {
+  const count = Math.min(100, Math.max(1, parseInt(req.query.count) || 10));
+  const platform = req.query.platform || 'steam';
+
+  try {
+    if (platform === 'steam') {
+      const response = await fetch(`http://m1:3000/random-review?count=${count}`);
+      if (!response.ok) {
+        return res.status(response.status).json({ error: 'Steam service failed to return games' });
+      }
+      const data = await response.json();
+      return res.json(data);
+    }
+
+    if (platform === 'epic') {
+      // TODO: Epic games service (m2) does not yet have a /random-review endpoint.
+      // When m2 is ready, replace this block with a fetch to http://m2:5000/random-review?count=${count}
+      // and return the data in the same shape as Steam's response:
+      // { count: number, results: [{ gameId, title, market, totalReviews, positiveReviews, header_image }] }
+      return res.status(503).json({
+        error: 'Epic Games platform is not yet available.',
+        message: 'The Epic service does not currently support review data. Check back later.'
+      });
+    }
+
+    return res.status(400).json({ error: `Unknown platform: ${platform}` });
+  } catch (error) {
+    console.error('Gateway /random-games error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch random games', details: error.message });
   }
 });
 

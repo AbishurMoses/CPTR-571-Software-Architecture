@@ -32,6 +32,49 @@ app.use((req, res, next) => {
     next();
 });
 
+// Steam content descriptor IDs we want to exclude:
+//   1 = Some Nudity or Sexual Content
+//   3 = Adult Only Sexual Content
+//   4 = Frequent Nudity or Sexual Content
+const ADULT_DESCRIPTOR_IDS = new Set([1, 3, 4]);
+
+// Cheap pre-filter on obviously NSFW titles so we don't waste an appdetails call.
+const ADULT_NAME_PATTERNS = [
+    /\bhentai\b/i,
+    /\bnsfw\b/i,
+    /\bwaifu\b/i,
+    /\becchi\b/i,
+    /\bxxx\b/i,
+    /\beroge\b/i,
+    /\badult\b/i,
+];
+
+function hasAdultName(name) {
+    if (!name) return false;
+    return ADULT_NAME_PATTERNS.some((re) => re.test(name));
+}
+
+async function isAdultGame(appId) {
+    try {
+        const url = `https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic,content_descriptors`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const entry = data?.[appId];
+        if (!entry?.success) return false;
+
+        const ids = entry.data?.content_descriptors?.ids || [];
+        if (ids.some((id) => ADULT_DESCRIPTOR_IDS.has(id))) return true;
+
+        // Steam flags some adult-only titles with required_age >= 18
+        if (Number(entry.data?.required_age) >= 18) return true;
+
+        return false;
+    } catch {
+        // If we can't verify, err on the safe side and treat as adult
+        return true;
+    }
+}
+
 app.get('/health', (req, res) => {
     res.json({
         message: "Steam API is working",
@@ -218,10 +261,16 @@ app.get('/prefetch-reviews', async (req, res) => {
                 if (!candidate) continue;
                 if (pickedThisRequest.has(candidate.appId)) continue;
 
+                // Cheap name filter first
+                if (hasAdultName(candidate.name)) continue;
+
                 const exists = await em.findOne(Review, { gameId: candidate.appId });
                 if (exists) continue;
 
                 pickedThisRequest.add(candidate.appId);
+
+                // Authoritative check against Steam's content descriptors
+                if (await isAdultGame(candidate.appId)) continue;
 
                 let data;
                 try {
@@ -333,6 +382,37 @@ app.get('/random-review', async (req, res) => {
     } catch (error) {
         console.error('Random review failed:', error);
         res.status(500).json({ error: 'Random review failed', details: error.message });
+    }
+});
+
+// Remove any already-stored reviews whose games turn out to be adult-rated.
+app.get('/prune-adult-reviews', async (req, res) => {
+    const em = req.em;
+    try {
+        const reviews = await em.find(Review, {});
+        const removed = [];
+
+        for (const r of reviews) {
+            const flaggedByName = hasAdultName(r.title);
+            const flaggedBySteam = flaggedByName ? true : await isAdultGame(r.gameId);
+
+            if (flaggedBySteam) {
+                removed.push({ gameId: r.gameId, title: r.title });
+                em.remove(r);
+            }
+        }
+
+        await em.flush();
+
+        res.json({
+            status: 'success',
+            checked: reviews.length,
+            removed: removed.length,
+            details: removed,
+        });
+    } catch (error) {
+        console.error('Prune adult reviews failed:', error);
+        res.status(500).json({ error: 'Prune failed', details: error.message });
     }
 });
 

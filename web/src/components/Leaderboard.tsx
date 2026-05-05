@@ -16,7 +16,7 @@ export default function Leaderboard() {
       credentials: "include",
     })
       .then(res => res.json())
-      .then(data => setPlayers(data));
+      .then(data => setPlayers(Array.isArray(data) ? data.slice(0, 10) : []));
   }, []);
 
 

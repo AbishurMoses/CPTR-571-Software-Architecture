@@ -2,9 +2,10 @@
   position: relative;
   width: 50%;
   height: 100vh;
-  background-size: cover;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+  background-color: #111;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -34,4 +35,22 @@
   text-align: center;
   max-width: 80%;
   z-index: 1;
+}
+
+.reviewCount {
+  position: absolute;
+  bottom: 24px;
+  background-color: rgba(0, 0, 0, 0.85);
+  padding: 10px 20px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 6px;
+  z-index: 2;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
